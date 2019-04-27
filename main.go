@@ -9,6 +9,8 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+const pongMessage = "PONG :tmi.twitch.tv\r\n"
+
 func main() {
 	fmt.Printf("[%s] Connecting to Twitch IRC...\n", time.Now())
 
@@ -45,7 +47,15 @@ func main() {
 				return
 			}
 
-			fmt.Printf("%s", bytes.NewBuffer(messageBytes).String())
+			message := bytes.NewBuffer(messageBytes).String()
+			fmt.Print(message)
+
+			// Respond to heartbeat message and move on to the next message
+			if message == "PING :tmi.twitch.tv\r\n" {
+				conn.WriteMessage(1, []byte(pongMessage))
+				fmt.Print(pongMessage)
+				continue
+			}
 		}
 	}()
 
