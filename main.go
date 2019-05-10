@@ -6,24 +6,18 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gorilla/websocket"
+	"github.com/carlcamit/ProvidenceBot/websocket"
 )
 
-const pongMessage = "PONG :tmi.twitch.tv\r\n"
+const (
+	pingMessage = "PING :tmi.twitch.tv\r\n"
+	pongMessage = "PONG :tmi.twitch.tv\r\n"
+)
 
 func main() {
 	fmt.Printf("[%s] Connecting to Twitch IRC...\n", time.Now())
 
-	var (
-		wg     = sync.WaitGroup{}
-		dialer = websocket.Dialer{
-			ReadBufferSize:   1024,
-			WriteBufferSize:  1024,
-			HandshakeTimeout: 30 * time.Second,
-		}
-	)
-
-	conn, _, err := dialer.Dial("wss://irc-ws.chat.twitch.tv:443", nil)
+	ws, err := websocket.NewConn()
 	if err != nil {
 		fmt.Printf("[%s] Cannot connect to Twitch IRC.\n", time.Now())
 		return
@@ -31,19 +25,20 @@ func main() {
 
 	fmt.Printf("[%s] Connected to Twitch IRC!\n", time.Now())
 
-	conn.WriteMessage(1, []byte("PASS <password>\r\n"))
-	conn.WriteMessage(1, []byte("NICK <name>\r\n"))
-	conn.WriteMessage(1, []byte("JOIN <channel>\r\n"))
+	ws.WriteText("PASS <password>\r\n")
+	ws.WriteText("NICK <name>\r\n")
+	ws.WriteText("JOIN <channel>\r\n")
 
+	wg := sync.WaitGroup{}
 	wg.Add(1)
 
 	go func() {
 		defer wg.Done()
 		for {
-			_, messageBytes, err := conn.ReadMessage()
+			messageBytes, err := ws.ReadMessage()
 			if err != nil {
 				fmt.Printf("[%s] Connection to Twitch IRC lost, err: %s\n", time.Now(), err)
-				conn.Close()
+				ws.CloseConn()
 				return
 			}
 
@@ -51,8 +46,8 @@ func main() {
 			fmt.Print(message)
 
 			// Respond to heartbeat message and move on to the next message
-			if message == "PING :tmi.twitch.tv\r\n" {
-				conn.WriteMessage(1, []byte(pongMessage))
+			if message == pingMessage {
+				ws.WriteText(pongMessage)
 				fmt.Print(pongMessage)
 				continue
 			}
